@@ -2,30 +2,48 @@
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Basim - Special Ops</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cyber Basim - Mobile Ops</title>
     <style>
-        body { margin: 0; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Courier New', monospace; }
-        canvas { border: 3px solid #0ff; box-shadow: 0 0 25px #0ff; border-radius: 10px; }
-        #ui { position: absolute; top: 20px; text-align: center; width: 100%; pointer-events: none; z-index: 20; }
-        .stat { font-size: 22px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: #0ff; }
+        body { margin: 0; background-color: #000; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Courier New', monospace; touch-action: none; }
+        canvas { border: 2px solid #0ff; box-shadow: 0 0 15px #0ff; border-radius: 10px; max-width: 95vw; max-height: 70vh; }
+        #ui { width: 100%; text-align: center; padding: 10px; z-index: 20; }
+        .stat { font-size: 18px; font-weight: bold; color: #0ff; margin-bottom: 5px; }
+        
+        /* كبسات التحكم للجوال */
+        .controls { display: flex; justify-content: space-around; width: 100%; max-width: 450px; padding: 20px 0; }
+        .btn { width: 70px; height: 70px; background: rgba(0, 255, 255, 0.2); border: 2px solid #0ff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; -webkit-user-select: none; user-select: none; }
+        .btn:active { background: rgba(0, 255, 255, 0.5); }
+        .fire-btn { background: rgba(255, 0, 0, 0.2); border-color: #f00; width: 80px; height: 80px; }
+
+        /* زر إعادة التشغيل */
+        #restartBtn { display: none; position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); padding: 15px 30px; font-size: 20px; background: #0ff; color: #000; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; z-index: 30; }
     </style>
 </head>
 <body>
 
     <div id="ui">
-        <div class="stat">Basim's Strike Count: <span id="score">0</span></div>
+        <div class="stat">SCORE: <span id="score">0</span> | LIVES: <span id="lives">3</span></div>
     </div>
+    
     <canvas id="gameCanvas" width="450" height="650"></canvas>
+    <button id="restartBtn" onclick="restartGame()">RESTART MISSION</button>
+
+    <div class="controls">
+        <div class="btn" id="leftBtn">◀</div>
+        <div class="btn fire-btn" id="fireBtn">🔥</div>
+        <div class="btn" id="rightBtn">▶</div>
+    </div>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const scoreElement = document.getElementById("score");
+        const livesElement = document.getElementById("lives");
+        const restartBtn = document.getElementById("restartBtn");
 
-        // تحميل صورة باسم
         const bgImg = new Image();
-        bgImg.src = 'basem.jpg'; // تأكد إن الصورة بنفس الاسم في جيت هاب
+        bgImg.src = 'basem.jpg'; 
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playSound(freq, type, duration, volume=0.1) {
@@ -37,47 +55,58 @@
                 gain.gain.setValueAtTime(volume, audioCtx.currentTime);
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + duration);
+                osc.start(); osc.stop(audioCtx.currentTime + duration);
             } catch(e) {}
         }
 
         let score = 0;
+        let lives = 3;
         let gameOver = false;
         let player = { x: 200, y: 580, width: 40, height: 40 };
         let bullets = [];
         let enemies = [];
         let keys = {};
 
-        function spawnEnemy() {
-            if(!gameOver) enemies.push({ x: Math.random() * (canvas.width - 30), y: -30, size: 25, speed: 2 + Math.random() * 3 });
-        }
-        setInterval(spawnEnemy, 900);
+        // التحكم باللمس
+        let moveLeft = false;
+        let moveRight = false;
 
-        window.addEventListener("keydown", (e) => {
-            keys[e.code] = true;
-            if(e.code === "Space" && !gameOver) {
-                bullets.push({ x: player.x + 15, y: player.y, w: 10, h: 20 });
-                playSound(440, 'sawtooth', 0.1);
-            }
-            if(e.code === "KeyR" && gameOver) restartGame();
+        document.getElementById("leftBtn").ontouchstart = (e) => { e.preventDefault(); moveLeft = true; };
+        document.getElementById("leftBtn").ontouchend = () => moveLeft = false;
+        document.getElementById("rightBtn").ontouchstart = (e) => { e.preventDefault(); moveRight = true; };
+        document.getElementById("rightBtn").ontouchend = () => moveRight = false;
+        document.getElementById("fireBtn").ontouchstart = (e) => { e.preventDefault(); fire(); };
+
+        // كيبورد للكمبيوتر
+        window.addEventListener("keydown", (e) => { 
+            keys[e.code] = true; 
+            if(e.code === "Space") fire();
         });
         window.addEventListener("keyup", (e) => keys[e.code] = false);
 
+        function fire() {
+            if(!gameOver) {
+                bullets.push({ x: player.x + 15, y: player.y, w: 10, h: 20 });
+                playSound(440, 'sawtooth', 0.1);
+            }
+        }
+
+        function spawnEnemy() {
+            if(!gameOver) enemies.push({ x: Math.random() * (canvas.width - 30), y: -30, size: 25, speed: 2 + Math.random() * 2 });
+        }
+        setInterval(spawnEnemy, 1000);
+
         function restartGame() {
-            score = 0;
-            scoreElement.innerText = score;
-            enemies = [];
-            bullets = [];
-            gameOver = false;
-            player.x = 200;
+            score = 0; lives = 3; enemies = []; bullets = []; gameOver = false;
+            scoreElement.innerText = score; livesElement.innerText = lives;
+            restartBtn.style.display = "none";
         }
 
         function update() {
             if(gameOver) return;
 
-            if (keys["ArrowLeft"] && player.x > 0) player.x -= 7;
-            if (keys["ArrowRight"] && player.x < canvas.width - player.width) player.x += 7;
+            if ((keys["ArrowLeft"] || moveLeft) && player.x > 0) player.x -= 7;
+            if ((keys["ArrowRight"] || moveRight) && player.x < canvas.width - player.width) player.x += 7;
 
             bullets.forEach((b, i) => {
                 b.y -= 10;
@@ -86,68 +115,49 @@
 
             enemies.forEach((e, i) => {
                 e.y += e.speed;
-
-                // خطر! تصادم العدو مع اللاعب
                 if (e.x < player.x + player.width && e.x + e.size > player.x && e.y < player.y + player.height && e.y + e.size > player.y) {
-                    gameOver = true;
-                    playSound(50, 'sawtooth', 0.5, 0.3); // صوت الخسارة
+                    enemies.splice(i, 1);
+                    lives--;
+                    livesElement.innerText = lives;
+                    playSound(100, 'sawtooth', 0.3, 0.2);
+                    if(lives <= 0) {
+                        gameOver = true;
+                        restartBtn.style.display = "block";
+                    }
                 }
-
                 bullets.forEach((b, j) => {
                     if(b.x < e.x + e.size && b.x + b.w > e.x && b.y < e.y + e.size && b.y + b.h > e.y) {
-                        enemies.splice(i, 1);
-                        bullets.splice(j, 1);
-                        score++;
-                        scoreElement.innerText = score;
+                        enemies.splice(i, 1); bullets.splice(j, 1);
+                        score++; scoreElement.innerText = score;
                         playSound(150, 'square', 0.2);
                     }
                 });
+                if(e.y > canvas.height) enemies.splice(i, 1);
             });
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // رسم صورة الخلفية
-            ctx.globalAlpha = 0.3; // شفافية الصورة عشان ما تشتت اللعب
-            if(bgImg.complete) {
-                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-            }
+            ctx.globalAlpha = 0.4;
+            if(bgImg.complete) ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
             ctx.globalAlpha = 1.0;
 
-            // Watermark
             ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
-            ctx.font = "bold 40px Arial";
-            ctx.textAlign = "center";
+            ctx.font = "bold 30px Arial"; ctx.textAlign = "center";
             ctx.fillText("THE HERO BASIM", canvas.width/2, canvas.height/2);
 
-            // Player
             ctx.fillStyle = "#0ff";
-            ctx.beginPath();
-            ctx.moveTo(player.x + 20, player.y);
-            ctx.lineTo(player.x + 40, player.y + 40);
-            ctx.lineTo(player.x, player.y + 40);
-            ctx.fill();
+            ctx.beginPath(); ctx.moveTo(player.x + 20, player.y); ctx.lineTo(player.x + 40, player.y + 40); ctx.lineTo(player.x, player.y + 40); ctx.fill();
 
-            // Bullets & Enemies
-            ctx.fillStyle = "yellow";
-            bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
-            ctx.fillStyle = "#f00";
-            enemies.forEach(e => {
-                ctx.beginPath();
-                ctx.arc(e.x + e.size/2, e.y + e.size/2, e.size/2, 0, Math.PI*2);
-                ctx.fill();
+            ctx.fillStyle = "yellow"; bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+            ctx.fillStyle = "#f00"; enemies.forEach(e => {
+                ctx.beginPath(); ctx.arc(e.x + e.size/2, e.y + e.size/2, e.size/2, 0, Math.PI*2); ctx.fill();
             });
 
             if(gameOver) {
-                ctx.fillStyle = "rgba(0,0,0,0.7)";
-                ctx.fillRect(0,0, canvas.width, canvas.height);
-                ctx.fillStyle = "red";
-                ctx.font = "bold 40px Arial";
-                ctx.fillText("MISSION FAILED", canvas.width/2, canvas.height/2 - 50);
-                ctx.fillStyle = "white";
-                ctx.font = "20px Arial";
-                ctx.fillText("Press R to Restart Mission", canvas.width/2, canvas.height/2 + 20);
+                ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0,0, canvas.width, canvas.height);
+                ctx.fillStyle = "red"; ctx.font = "bold 40px Arial";
+                ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 20);
             }
         }
 
