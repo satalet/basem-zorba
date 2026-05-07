@@ -6,15 +6,15 @@
     <title>Cyber Basim - Special Ops</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Courier New', monospace; }
-        canvas { border: 3px solid #0ff; box-shadow: 0 0 25px #0ff; border-radius: 10px; cursor: crosshair; }
-        #ui { position: absolute; top: 20px; text-align: center; width: 100%; pointer-events: none; }
-        .stat { font-size: 22px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+        canvas { border: 3px solid #0ff; box-shadow: 0 0 25px #0ff; border-radius: 10px; }
+        #ui { position: absolute; top: 20px; text-align: center; width: 100%; pointer-events: none; z-index: 20; }
+        .stat { font-size: 22px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: #0ff; }
     </style>
 </head>
 <body>
 
     <div id="ui">
-        <div class="stat">Commander Basim Strike Count: <span id="score">0</span></div>
+        <div class="stat">Basim's Strike Count: <span id="score">0</span></div>
     </div>
     <canvas id="gameCanvas" width="450" height="650"></canvas>
 
@@ -23,44 +23,59 @@
         const ctx = canvas.getContext("2d");
         const scoreElement = document.getElementById("score");
 
-        // --- محرك الأصوات البرمجي ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // تحميل صورة باسم
+        const bgImg = new Image();
+        bgImg.src = 'basem.jpg'; // تأكد إن الصورة بنفس الاسم في جيت هاب
 
-        function playSound(freq, type, duration) {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + duration);
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(freq, type, duration, volume=0.1) {
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
         }
 
         let score = 0;
+        let gameOver = false;
         let player = { x: 200, y: 580, width: 40, height: 40 };
         let bullets = [];
         let enemies = [];
         let keys = {};
 
         function spawnEnemy() {
-            enemies.push({ x: Math.random() * (canvas.width - 30), y: -30, size: 25, speed: 2 + Math.random() * 3 });
+            if(!gameOver) enemies.push({ x: Math.random() * (canvas.width - 30), y: -30, size: 25, speed: 2 + Math.random() * 3 });
         }
         setInterval(spawnEnemy, 900);
 
         window.addEventListener("keydown", (e) => {
             keys[e.code] = true;
-            if(e.code === "Space") {
+            if(e.code === "Space" && !gameOver) {
                 bullets.push({ x: player.x + 15, y: player.y, w: 10, h: 20 });
-                playSound(440, 'sawtooth', 0.1); // صوت إطلاق النار
+                playSound(440, 'sawtooth', 0.1);
             }
+            if(e.code === "KeyR" && gameOver) restartGame();
         });
         window.addEventListener("keyup", (e) => keys[e.code] = false);
 
+        function restartGame() {
+            score = 0;
+            scoreElement.innerText = score;
+            enemies = [];
+            bullets = [];
+            gameOver = false;
+            player.x = 200;
+        }
+
         function update() {
+            if(gameOver) return;
+
             if (keys["ArrowLeft"] && player.x > 0) player.x -= 7;
             if (keys["ArrowRight"] && player.x < canvas.width - player.width) player.x += 7;
 
@@ -71,29 +86,42 @@
 
             enemies.forEach((e, i) => {
                 e.y += e.speed;
+
+                // خطر! تصادم العدو مع اللاعب
+                if (e.x < player.x + player.width && e.x + e.size > player.x && e.y < player.y + player.height && e.y + e.size > player.y) {
+                    gameOver = true;
+                    playSound(50, 'sawtooth', 0.5, 0.3); // صوت الخسارة
+                }
+
                 bullets.forEach((b, j) => {
                     if(b.x < e.x + e.size && b.x + b.w > e.x && b.y < e.y + e.size && b.y + b.h > e.y) {
                         enemies.splice(i, 1);
                         bullets.splice(j, 1);
                         score++;
                         scoreElement.innerText = score;
-                        playSound(150, 'square', 0.2); // صوت الانفجار
+                        playSound(150, 'square', 0.2);
                     }
                 });
             });
         }
 
         function draw() {
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // رسم صورة الخلفية
+            ctx.globalAlpha = 0.3; // شفافية الصورة عشان ما تشتت اللعب
+            if(bgImg.complete) {
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+            }
+            ctx.globalAlpha = 1.0;
 
             // Watermark
-            ctx.fillStyle = "#111";
+            ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
             ctx.font = "bold 40px Arial";
             ctx.textAlign = "center";
             ctx.fillText("THE HERO BASIM", canvas.width/2, canvas.height/2);
 
-            // Player (Spaceship)
+            // Player
             ctx.fillStyle = "#0ff";
             ctx.beginPath();
             ctx.moveTo(player.x + 20, player.y);
@@ -101,17 +129,26 @@
             ctx.lineTo(player.x, player.y + 40);
             ctx.fill();
 
-            // Bullets
+            // Bullets & Enemies
             ctx.fillStyle = "yellow";
             bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
-
-            // Enemies
             ctx.fillStyle = "#f00";
             enemies.forEach(e => {
                 ctx.beginPath();
                 ctx.arc(e.x + e.size/2, e.y + e.size/2, e.size/2, 0, Math.PI*2);
                 ctx.fill();
             });
+
+            if(gameOver) {
+                ctx.fillStyle = "rgba(0,0,0,0.7)";
+                ctx.fillRect(0,0, canvas.width, canvas.height);
+                ctx.fillStyle = "red";
+                ctx.font = "bold 40px Arial";
+                ctx.fillText("MISSION FAILED", canvas.width/2, canvas.height/2 - 50);
+                ctx.fillStyle = "white";
+                ctx.font = "20px Arial";
+                ctx.fillText("Press R to Restart Mission", canvas.width/2, canvas.height/2 + 20);
+            }
         }
 
         function loop() { update(); draw(); requestAnimationFrame(loop); }
