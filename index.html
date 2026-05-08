@@ -3,22 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cyber Basim - Music Edition</title>
+    <title>Cyber Basim - Final Edition</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Courier New', monospace; touch-action: none; }
         canvas { border: 2px solid #0ff; box-shadow: 0 0 15px #0ff; border-radius: 10px; max-width: 95vw; max-height: 70vh; }
-        #ui { width: 100%; text-align: center; padding: 10px; z-index: 20; }
+        
+        #ui { width: 100%; text-align: center; padding: 10px; z-index: 20; position: relative; }
         .stat { font-size: 18px; font-weight: bold; color: #0ff; margin-bottom: 5px; }
+        
+        /* كبسة الكتم - للموسيقى فقط */
+        .mute-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            width: 45px;
+            height: 45px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 2px solid #0ff;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 100;
+        }
+
         .controls { display: flex; justify-content: space-around; width: 100%; max-width: 450px; padding: 20px 0; }
         .btn { width: 70px; height: 70px; background: rgba(0, 255, 255, 0.2); border: 2px solid #0ff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; -webkit-user-select: none; user-select: none; }
         .btn:active { background: rgba(0, 255, 255, 0.5); }
         .fire-btn { background: rgba(255, 0, 0, 0.2); border-color: #f00; width: 80px; height: 80px; }
+        
         #restartBtn { display: none; position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); padding: 15px 30px; font-size: 20px; background: #0ff; color: #000; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; z-index: 30; }
     </style>
 </head>
 <body>
 
     <div id="ui">
+        <div class="mute-btn" id="muteBtn" onclick="toggleMusic(event)">🔊</div>
         <div class="stat">SCORE: <span id="score">0</span> | LIVES: <span id="lives">3</span></div>
     </div>
     
@@ -37,22 +59,34 @@
         const scoreElement = document.getElementById("score");
         const livesElement = document.getElementById("lives");
         const restartBtn = document.getElementById("restartBtn");
+        const muteBtn = document.getElementById("muteBtn");
 
-        // --- إعداد الموسيقى والخلفية ---
+        // --- إعدادات الميديا ---
         const bgImg = new Image();
         bgImg.src = 'basem.jpg'; 
 
         const bgMusic = new Audio('basem123.mp3');
-        bgMusic.loop = true; // عشان تعيد حالها
+        bgMusic.loop = true;
         let musicStarted = false;
+        let musicMuted = false;
 
         function startMusic() {
             if (!musicStarted) {
-                bgMusic.play().catch(e => console.log("Music waiting for interaction"));
+                bgMusic.play().catch(() => {});
                 musicStarted = true;
             }
         }
 
+        function toggleMusic(e) {
+            e.stopPropagation();
+            startMusic();
+            musicMuted = !musicMuted;
+            bgMusic.muted = musicMuted;
+            muteBtn.innerText = musicMuted ? "🔇" : "🔊";
+            muteBtn.style.borderColor = musicMuted ? "#f00" : "#0ff";
+        }
+
+        // صوت الطخ والانفجار (Web Audio API) - ما بيتأثر بكتم الموسيقى
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playSound(freq, type, duration, volume=0.1) {
             try {
@@ -67,29 +101,19 @@
             } catch(e) {}
         }
 
-        let score = 0;
-        let lives = 3;
-        let gameOver = false;
+        let score = 0, lives = 3, gameOver = false;
         let player = { x: 200, y: 580, width: 40, height: 40 };
-        let bullets = [];
-        let enemies = [];
-        let keys = {};
+        let bullets = [], enemies = [], keys = {};
+        let moveLeft = false, moveRight = false;
 
-        let moveLeft = false;
-        let moveRight = false;
-
-        // تشغيل الموسيقى مع أول لمسة
+        // التحكم
         document.getElementById("leftBtn").ontouchstart = (e) => { e.preventDefault(); startMusic(); moveLeft = true; };
         document.getElementById("leftBtn").ontouchend = () => moveLeft = false;
         document.getElementById("rightBtn").ontouchstart = (e) => { e.preventDefault(); startMusic(); moveRight = true; };
         document.getElementById("rightBtn").ontouchend = () => moveRight = false;
         document.getElementById("fireBtn").ontouchstart = (e) => { e.preventDefault(); startMusic(); fire(); };
 
-        window.addEventListener("keydown", (e) => { 
-            startMusic();
-            keys[e.code] = true; 
-            if(e.code === "Space") fire();
-        });
+        window.addEventListener("keydown", (e) => { startMusic(); keys[e.code] = true; if(e.code === "Space") fire(); });
         window.addEventListener("keyup", (e) => keys[e.code] = false);
 
         function fire() {
@@ -123,14 +147,9 @@
             enemies.forEach((e, i) => {
                 e.y += e.speed;
                 if (e.x < player.x + player.width && e.x + e.size > player.x && e.y < player.y + player.height && e.y + e.size > player.y) {
-                    enemies.splice(i, 1);
-                    lives--;
-                    livesElement.innerText = lives;
+                    enemies.splice(i, 1); lives--; livesElement.innerText = lives;
                     playSound(100, 'sawtooth', 0.3, 0.2);
-                    if(lives <= 0) {
-                        gameOver = true;
-                        restartBtn.style.display = "block";
-                    }
+                    if(lives <= 0) { gameOver = true; restartBtn.style.display = "block"; }
                 }
                 bullets.forEach((b, j) => {
                     if(b.x < e.x + e.size && b.x + b.w > e.x && b.y < e.y + e.size && b.y + b.h > e.y) {
@@ -163,7 +182,6 @@
                 ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 20);
             }
         }
-
         function loop() { update(); draw(); requestAnimationFrame(loop); }
         loop();
     </script>
