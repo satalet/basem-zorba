@@ -3,20 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cyber Basim - Mobile Ops</title>
+    <title>Cyber Basim - Music Edition</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Courier New', monospace; touch-action: none; }
         canvas { border: 2px solid #0ff; box-shadow: 0 0 15px #0ff; border-radius: 10px; max-width: 95vw; max-height: 70vh; }
         #ui { width: 100%; text-align: center; padding: 10px; z-index: 20; }
         .stat { font-size: 18px; font-weight: bold; color: #0ff; margin-bottom: 5px; }
-        
-        /* كبسات التحكم للجوال */
         .controls { display: flex; justify-content: space-around; width: 100%; max-width: 450px; padding: 20px 0; }
         .btn { width: 70px; height: 70px; background: rgba(0, 255, 255, 0.2); border: 2px solid #0ff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 30px; -webkit-user-select: none; user-select: none; }
         .btn:active { background: rgba(0, 255, 255, 0.5); }
         .fire-btn { background: rgba(255, 0, 0, 0.2); border-color: #f00; width: 80px; height: 80px; }
-
-        /* زر إعادة التشغيل */
         #restartBtn { display: none; position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); padding: 15px 30px; font-size: 20px; background: #0ff; color: #000; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; z-index: 30; }
     </style>
 </head>
@@ -42,8 +38,20 @@
         const livesElement = document.getElementById("lives");
         const restartBtn = document.getElementById("restartBtn");
 
+        // --- إعداد الموسيقى والخلفية ---
         const bgImg = new Image();
         bgImg.src = 'basem.jpg'; 
+
+        const bgMusic = new Audio('basem123.mp3');
+        bgMusic.loop = true; // عشان تعيد حالها
+        let musicStarted = false;
+
+        function startMusic() {
+            if (!musicStarted) {
+                bgMusic.play().catch(e => console.log("Music waiting for interaction"));
+                musicStarted = true;
+            }
+        }
 
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playSound(freq, type, duration, volume=0.1) {
@@ -67,18 +75,18 @@
         let enemies = [];
         let keys = {};
 
-        // التحكم باللمس
         let moveLeft = false;
         let moveRight = false;
 
-        document.getElementById("leftBtn").ontouchstart = (e) => { e.preventDefault(); moveLeft = true; };
+        // تشغيل الموسيقى مع أول لمسة
+        document.getElementById("leftBtn").ontouchstart = (e) => { e.preventDefault(); startMusic(); moveLeft = true; };
         document.getElementById("leftBtn").ontouchend = () => moveLeft = false;
-        document.getElementById("rightBtn").ontouchstart = (e) => { e.preventDefault(); moveRight = true; };
+        document.getElementById("rightBtn").ontouchstart = (e) => { e.preventDefault(); startMusic(); moveRight = true; };
         document.getElementById("rightBtn").ontouchend = () => moveRight = false;
-        document.getElementById("fireBtn").ontouchstart = (e) => { e.preventDefault(); fire(); };
+        document.getElementById("fireBtn").ontouchstart = (e) => { e.preventDefault(); startMusic(); fire(); };
 
-        // كيبورد للكمبيوتر
         window.addEventListener("keydown", (e) => { 
+            startMusic();
             keys[e.code] = true; 
             if(e.code === "Space") fire();
         });
@@ -104,7 +112,6 @@
 
         function update() {
             if(gameOver) return;
-
             if ((keys["ArrowLeft"] || moveLeft) && player.x > 0) player.x -= 7;
             if ((keys["ArrowRight"] || moveRight) && player.x < canvas.width - player.width) player.x += 7;
 
@@ -141,19 +148,15 @@
             ctx.globalAlpha = 0.4;
             if(bgImg.complete) ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
             ctx.globalAlpha = 1.0;
-
             ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
             ctx.font = "bold 30px Arial"; ctx.textAlign = "center";
             ctx.fillText("THE HERO BASIM", canvas.width/2, canvas.height/2);
-
             ctx.fillStyle = "#0ff";
             ctx.beginPath(); ctx.moveTo(player.x + 20, player.y); ctx.lineTo(player.x + 40, player.y + 40); ctx.lineTo(player.x, player.y + 40); ctx.fill();
-
             ctx.fillStyle = "yellow"; bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
             ctx.fillStyle = "#f00"; enemies.forEach(e => {
                 ctx.beginPath(); ctx.arc(e.x + e.size/2, e.y + e.size/2, e.size/2, 0, Math.PI*2); ctx.fill();
             });
-
             if(gameOver) {
                 ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0,0, canvas.width, canvas.height);
                 ctx.fillStyle = "red"; ctx.font = "bold 40px Arial";
